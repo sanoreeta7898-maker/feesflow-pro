@@ -14,6 +14,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -51,30 +53,50 @@
   <!-- Toast Container -->
   <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
 
-  <!-- ======================= 1. MAIN UNIFIED LOGIN SCREEN ======================= -->
-  <div id="auth-lock-overlay" class="fixed inset-0 z-40 bg-gradient-to-br from-slate-900 via-brand-900 to-indigo-950 flex items-center justify-center p-4 no-print">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-100 space-y-6">
-      <div class="text-center space-y-2">
+  <!-- ======================= 1. MAIN UNIFIED AUTH SCREEN (LOGIN / 3-DAY TRIAL SIGNUP / FORGOT) ======================= -->
+  <div id="auth-lock-overlay" class="fixed inset-0 z-40 bg-gradient-to-br from-slate-900 via-brand-900 to-indigo-950 flex items-center justify-center p-4 no-print overflow-y-auto">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 my-auto">
+      <div class="text-center space-y-1.5">
         <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-500 mx-auto flex items-center justify-center text-white shadow-lg shadow-brand-500/30 font-extrabold text-2xl">
           ₹
         </div>
         <h2 class="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">FeesFlow Pro</h2>
-        <p class="text-xs sm:text-sm text-slate-500">लॉगिन करने के लिए अपनी यूजर आईडी और पासवर्ड दर्ज करें</p>
+        <p class="text-xs text-slate-500">सुरक्षित क्लाउड स्कूल फीस मैनेजमेंट • Firebase Auth लॉक</p>
       </div>
 
-      <form id="login-form" class="space-y-4">
-        <div id="login-error-box" class="hidden bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center space-x-2">
-          <svg class="w-4 h-4 flex-shrink-0 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-          <span id="login-error-text">गलत यूजर आईडी या पासवर्ड!</span>
+      <!-- Mode Switch Tabs (Login / 3-Day Free Trial Signup) -->
+      <div id="auth-mode-tabs" class="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+        <button type="button" id="auth-tab-login" class="py-2 text-xs font-extrabold rounded-lg bg-brand-600 text-white shadow-sm transition">
+          🔐 लॉग-इन (Login)
+        </button>
+        <button type="button" id="auth-tab-signup" class="py-2 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition">
+          🎁 3 दिन फ्री ट्रायल (Sign Up)
+        </button>
+      </div>
+
+      <!-- Shared Error & Info Alert Box -->
+      <div id="login-error-box" class="hidden bg-rose-50 border border-rose-200 text-rose-700 px-3 py-2.5 rounded-xl text-xs font-semibold flex items-start space-x-2">
+        <svg class="w-4 h-4 flex-shrink-0 text-rose-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span id="login-error-text">गलत Gmail या पासवर्ड!</span>
+      </div>
+      <div id="login-success-box" class="hidden bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-2.5 rounded-xl text-xs font-semibold">
+        <span id="login-success-text"></span>
+      </div>
+
+      <!-- PANEL A: LOGIN FORM -->
+      <form id="login-form" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">रजिस्टर्ड Gmail ID *</label>
+          <input type="email" id="login-userid-input" name="email" required autocomplete="username" placeholder="उदा. school@gmail.com" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none">
         </div>
 
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">यूजर आईडी (User ID) *</label>
-          <input type="text" id="login-userid-input" name="username" required autocomplete="username" placeholder="अपनी यूजर आईडी लिखें" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none">
-        </div>
-
-        <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">पासवर्ड (Password) *</label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-bold text-slate-700 uppercase">पासवर्ड (Password) *</label>
+            <button type="button" id="open-forgot-pass-btn" class="text-[11px] font-bold text-brand-600 hover:text-brand-800 hover:underline">
+              पासवर्ड भूल गए?
+            </button>
+          </div>
           <div class="relative">
             <input type="password" id="login-password-input" name="password" required autocomplete="current-password" placeholder="••••••••" class="w-full px-3.5 pr-16 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none">
             <button type="button" id="toggle-login-pass-btn" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 text-xs font-semibold">
@@ -83,10 +105,10 @@
           </div>
         </div>
 
-        <div class="flex items-center justify-between pt-1">
+        <div class="flex items-center justify-between pt-0.5">
           <label class="inline-flex items-center space-x-2 cursor-pointer select-none">
             <input type="checkbox" id="remember-me-checkbox" checked class="w-4 h-4 text-brand-600 border-slate-300 rounded focus:ring-brand-500">
-            <span class="text-xs font-semibold text-slate-700">आईडी और पासवर्ड सेव रखें (Auto-Login)</span>
+            <span class="text-xs font-semibold text-slate-700">लॉगिन सेव रखें (Auto-Login)</span>
           </label>
         </div>
 
@@ -95,10 +117,93 @@
         </button>
       </form>
 
-      <div class="border-t border-slate-100 pt-4 space-y-2.5 text-center">
-        <p class="text-[11px] text-slate-500 font-medium">क्या आपके पास स्कूल लॉगिन ID नहीं है?</p>
+      <!-- PANEL B: SELF SIGN-UP FORM (3-DAY FREE TRIAL) -->
+      <form id="signup-form" class="hidden space-y-3">
+        <div id="signup-trial-banner" class="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 text-[11px] text-emerald-900 font-semibold">
+          🎁 नए स्कूल/कोचिंग के लिए <strong>3 दिन का फ्री ट्रायल</strong>। Gmail वेरिफाई करते ही तुरंत शुरू हो जाएगा!
+        </div>
+        <div id="signup-school-fields" class="space-y-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">स्कूल / कोचिंग का पूरा नाम *</label>
+            <input type="text" id="signup-school-name" required placeholder="उदा. सरस्वती विद्या मंदिर" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-semibold">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">मोबाइल / WhatsApp नंबर *</label>
+            <input type="tel" id="signup-phone" required placeholder="उदा. 9826XXXXXX" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none font-mono">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">आपकी Gmail ID *</label>
+          <input type="email" id="signup-email" required placeholder="उदा. yourschool@gmail.com" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">पासवर्ड (6+ अक्षर) *</label>
+            <input type="password" id="signup-password" required minlength="6" placeholder="••••••" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">पासवर्ड पुष्टि *</label>
+            <input type="password" id="signup-confirm-password" required minlength="6" placeholder="••••••" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none">
+          </div>
+        </div>
+        <button type="submit" id="signup-submit-btn" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-xl shadow-md transition">
+          <span id="signup-btn-label">🎁 3 दिन फ्री ट्रायल शुरू करें</span>
+        </button>
+      </form>
+
+      <!-- PANEL C: FORGOT PASSWORD FORM -->
+      <form id="forgot-form" class="hidden space-y-3.5">
+        <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 text-xs text-indigo-900">
+          अपनी रजिस्टर्ड Gmail ID लिखें — हम उस पर <strong>पासवर्ड रीसेट लिंक</strong> भेज देंगे।
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">रजिस्टर्ड Gmail ID *</label>
+          <input type="email" id="forgot-email-input" required placeholder="उदा. school@gmail.com" class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none">
+        </div>
+        <button type="submit" id="forgot-submit-btn" class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition">
+          📧 पासवर्ड रीसेट लिंक Gmail पर भेजें
+        </button>
+        <button type="button" id="back-to-login-from-forgot-btn" class="w-full py-2 text-xs font-bold text-slate-600 hover:text-slate-900">
+          ← वापस लॉग-इन पर जाएं
+        </button>
+      </form>
+
+      <div class="border-t border-slate-100 pt-3.5 space-y-2 text-center">
+        <p class="text-[11px] text-slate-500 font-medium">फुल प्लान लेना या रिन्यू करना चाहते हैं?</p>
         <button type="button" id="open-buy-plan-btn" class="w-full py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-extrabold text-xs sm:text-sm rounded-xl transition flex items-center justify-center space-x-1.5 shadow-sm">
-          <span>💳 नया स्कूल अकाउंट खरीदें / पेमेंट करें (Get ID)</span>
+          <span>💳 सॉफ्टवेयर प्लान देखें / पेमेंट करें</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= 1B. GMAIL VERIFICATION OVERLAY (FREE OTP EQUIVALENT) ======================= -->
+  <div id="email-verify-overlay" class="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 no-print hidden">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 sm:p-7 shadow-2xl border-2 border-indigo-500 text-center space-y-4">
+      <div class="w-16 h-16 rounded-2xl bg-indigo-100 text-indigo-600 mx-auto flex items-center justify-center text-3xl">
+        📧
+      </div>
+      <div class="space-y-1">
+        <span class="bg-indigo-100 text-indigo-800 text-[11px] font-extrabold px-3 py-1 rounded-full uppercase">Gmail वेरिफिकेशन ज़रूरी</span>
+        <h2 class="text-xl font-extrabold text-slate-900 pt-1">अपनी Gmail ID वेरिफाई करें</h2>
+        <p class="text-xs text-slate-600">हमने आपकी ईमेल <strong id="verify-email-display" class="text-brand-700 font-mono"></strong> पर वेरिफिकेशन लिंक भेजा है।</p>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-left text-xs text-slate-700 space-y-1.5">
+        <p><strong>1.</strong> अपने फोन में <strong>Gmail ऐप</strong> खोलें (Inbox या <strong>Spam</strong> फोल्डर जांचें)।</p>
+        <p><strong>2.</strong> आए हुए वेरिफिकेशन लिंक पर टैप करें।</p>
+        <p><strong>3.</strong> वापस आकर नीचे दिया गया हरा बटन दबाएं।</p>
+      </div>
+
+      <button type="button" id="verify-check-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-extrabold rounded-xl shadow-md transition">
+        ✅ मैंने वेरिफाई कर लिया — आगे बढ़ें
+      </button>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" id="verify-resend-btn" class="py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-xs font-bold rounded-xl transition">
+          🔁 लिंक दोबारा भेजें
+        </button>
+        <button type="button" id="verify-logout-btn" class="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">
+          ← लॉगआउट करें
         </button>
       </div>
     </div>
@@ -146,7 +251,7 @@
             ↻ रिफ्रेश
           </button>
           <button id="sa-settings-btn" class="px-3 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 rounded-lg transition">
-            ⚙️ एडमिन पासवर्ड
+            ⚙️ सेटिंग्स व पासवर्ड
           </button>
           <button id="sa-logout-btn" class="px-3 py-1.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 rounded-lg transition">
             लॉगआउट
@@ -263,7 +368,7 @@
 
             <!-- Change / View School ID & Password (Permanent) -->
             <button id="header-school-cred-btn" class="inline-flex items-center px-2 py-1.5 sm:px-2.5 sm:py-2 text-xs font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-lg transition" title="अपनी लॉगिन ID और पासवर्ड देखें या बदलें">
-              🔑 ID व पासवर्ड
+              🔑 पासवर्ड / सुरक्षा
             </button>
 
             <!-- Manual Sync Refresh -->
@@ -489,7 +594,7 @@
 
   <!-- ======================= MODALS ======================= -->
 
-  <!-- Modal A: Super Admin Add / Edit School Modal -->
+  <!-- Modal A: Super Admin Add / Edit / Migrate School Modal -->
   <div id="sa-school-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[92vh] overflow-y-auto custom-scrollbar">
       <div class="flex justify-between items-center pb-3 border-b border-slate-100">
@@ -499,38 +604,54 @@
 
       <form id="sa-school-form" class="mt-4 space-y-3.5 text-xs sm:text-sm">
         <input type="hidden" id="sa-form-edit-mode" value="new">
+        <input type="hidden" id="sa-form-existing-uid" value="">
 
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">स्कूल / संस्थान का पूरा नाम (रसीद पर छपेगा - लॉक रहेगा) *</label>
           <input type="text" id="sa-form-school-name" required placeholder="उदा. आदर्श विद्या मंदिर हाई स्कूल" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold outline-none focus:ring-2 focus:ring-brand-500">
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">स्कूल लॉगिन ID (बिना स्पेस) *</label>
-            <input type="text" id="sa-form-school-id" required placeholder="उदा. adarsh_school" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">स्कूल पासवर्ड *</label>
-            <input type="text" id="sa-form-school-pass" required placeholder="उदा. 12345" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold outline-none focus:ring-2 focus:ring-brand-500">
-          </div>
+        <div id="sa-migrate-notice" class="hidden bg-amber-50 border border-amber-300 rounded-xl p-2.5 text-xs text-amber-900 font-semibold">
+          ⚠️ यह पुराना अकाउंट है। इसे सुरक्षित करने के लिए नीचे इस स्कूल की <strong>Gmail ID</strong> और नया <strong>पासवर्ड (6+ अक्षर)</strong> डालकर सेव करें — सारा पुराना डेटा अपने आप जुड़ा रहेगा।
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">स्कूल का पता / मोबाइल</label>
-            <input type="text" id="sa-form-school-address" placeholder="उदा. मेन रोड, अशोकनगर" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">स्कूल लॉगिन Gmail ID *</label>
+            <input type="email" id="sa-form-school-email" required placeholder="उदा. adarshschool@gmail.com" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+          <div id="sa-form-pass-wrap">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">शुरुआती पासवर्ड (6+ अक्षर) *</label>
+            <input type="text" id="sa-form-school-pass" minlength="6" placeholder="उदा. 123456" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold outline-none focus:ring-2 focus:ring-brand-500">
+          </div>
+        </div>
+
+        <div id="sa-form-reset-wrap" class="hidden bg-indigo-50 border border-indigo-200 rounded-xl p-2.5 flex items-center justify-between gap-2">
+          <span class="text-[11px] font-bold text-indigo-900">🔒 Firebase Auth सुरक्षित (पासवर्ड एन्क्रिप्टेड है)</span>
+          <button type="button" id="sa-send-school-reset-btn" class="px-2.5 py-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg whitespace-nowrap">
+            📧 रीसेट लिंक भेजें
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">डेटाबेस कोड ID *</label>
+            <input type="text" id="sa-form-school-id" required placeholder="उदा. adarsh_school" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-xs font-bold outline-none focus:ring-2 focus:ring-brand-500">
           </div>
           <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">स्कूल की UPI ID (वैकल्पिक)</label>
-            <input type="text" id="sa-form-school-upi" placeholder="उदा. school@ybl" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono outline-none">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">पता / मोबाइल</label>
+            <input type="text" id="sa-form-school-address" placeholder="मेन रोड, अशोकनगर" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">स्कूल UPI ID</label>
+            <input type="text" id="sa-form-school-upi" placeholder="school@ybl" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono outline-none">
           </div>
         </div>
 
         <div class="bg-indigo-50/70 p-3 rounded-xl border border-indigo-200 space-y-2">
           <label class="block text-xs font-bold text-indigo-950 uppercase">प्लान व समाप्ति दिनांक (Expiry Date) *</label>
           <div class="grid grid-cols-3 gap-2">
-            <button type="button" class="sa-quick-days py-1.5 bg-white hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded border border-indigo-200" data-days="7">+7 दिन डेमो</button>
+            <button type="button" class="sa-quick-days py-1.5 bg-white hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded border border-indigo-200" data-days="3">+3 दिन डेमो</button>
             <button type="button" class="sa-quick-days py-1.5 bg-white hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded border border-indigo-200" data-days="30">+1 महीना</button>
             <button type="button" class="sa-quick-days py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded" data-days="365">+1 साल</button>
           </div>
@@ -550,35 +671,29 @@
 
         <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
           <button type="button" id="cancel-sa-school-modal" class="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg">रद्द करें</button>
-          <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow">सेव व लाइव करें</button>
+          <button type="submit" id="sa-school-submit-btn" class="px-5 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow">सेव व लाइव करें</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Modal B: Super Admin Own Settings -->
+  <!-- Modal B: Super Admin Own Settings & Secure Password Change -->
   <div id="sa-settings-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
       <div class="flex justify-between items-center pb-2 border-b border-slate-100">
-        <h3 class="text-base font-bold text-slate-900">⚙️ मास्टर एडमिन सेटिंग्स</h3>
+        <h3 class="text-base font-bold text-slate-900">⚙️ मास्टर एडमिन सेटिंग्स व सुरक्षा</h3>
         <button id="close-sa-settings-modal" class="text-slate-400 hover:text-slate-600 p-1">✕</button>
       </div>
-      <form id="sa-settings-form" class="space-y-3 text-xs sm:text-sm max-h-[80vh] overflow-y-auto pr-1 custom-scrollbar">
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">मास्टर लॉगिन ID *</label>
-            <input type="text" id="sa-set-user" required class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold">
-          </div>
-          <div>
-            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">मास्टर पासवर्ड *</label>
-            <input type="text" id="sa-set-pass" required minlength="4" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold">
-          </div>
-        </div>
+      <div class="bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs flex justify-between items-center">
+        <span class="text-slate-600 font-medium">सुपर एडमिन Gmail:</span>
+        <strong id="sa-admin-email-label" class="font-mono text-brand-700">sanoreeta7898@gmail.com</strong>
+      </div>
+      <form id="sa-settings-form" class="space-y-3 text-xs sm:text-sm">
         <div>
           <label class="block text-xs font-bold text-slate-700 uppercase mb-1">आपका नाम व सपोर्ट विवरण *</label>
           <input type="text" id="sa-set-contact" required placeholder="उदा. संजीव साहू (सॉफ्टवेयर एडमिन)" class="w-full px-3 py-2 border border-slate-300 rounded-lg">
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2 border-t border-slate-100">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           <div>
             <label class="block text-xs font-bold text-emerald-800 uppercase mb-1">आपका WhatsApp नंबर *</label>
             <input type="tel" id="sa-set-whatsapp" placeholder="उदा. 9826123456" class="w-full px-3 py-2 border border-emerald-300 rounded-lg font-mono font-bold">
@@ -598,11 +713,27 @@
             <input type="number" id="sa-set-yearly-price" placeholder="1999" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold">
           </div>
         </div>
-        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
+        <div class="flex justify-end space-x-2 pt-2">
           <button type="button" id="cancel-sa-settings-modal" class="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 rounded-lg">रद्द करें</button>
-          <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">सेव करें</button>
+          <button type="submit" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg">प्लान सेटिंग्स सेव करें</button>
         </div>
       </form>
+
+      <div class="border-t border-slate-200 pt-3 space-y-2.5">
+        <h4 class="text-xs font-extrabold text-slate-800 uppercase">🔐 सुपर एडमिन पासवर्ड बदलें (Firebase Auth)</h4>
+        <form id="sa-change-pass-form" class="space-y-2.5 text-xs">
+          <input type="password" id="sa-curr-pass" required placeholder="वर्तमान पासवर्ड लिखें" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none">
+          <input type="password" id="sa-new-pass" required minlength="6" placeholder="नया पासवर्ड (कम से कम 6 अक्षर)" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none">
+          <div class="flex items-center justify-between gap-2">
+            <button type="button" id="sa-self-reset-email-btn" class="px-3 py-2 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg">
+              📧 Gmail रीसेट लिंक
+            </button>
+            <button type="submit" id="sa-change-pass-submit-btn" class="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg">
+              पासवर्ड अपडेट करें
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   </div>
 
@@ -1038,35 +1169,43 @@
     </div>
   </div>
 
-  <!-- Modal 8: School User View / Change ID & Password Modal -->
+  <!-- Modal 8: School User Secure Password & Account Modal -->
   <div id="school-cred-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm hidden">
     <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <div class="flex justify-between items-center pb-2 border-b border-slate-100">
         <div>
-          <h3 class="text-base font-bold text-slate-900">🔑 आपकी लॉगिन ID व पासवर्ड</h3>
-          <p class="text-[11px] text-slate-500">यहाँ से आप अपनी वर्तमान ID/पासवर्ड देख सकते हैं और बदल भी सकते हैं</p>
+          <h3 class="text-base font-bold text-slate-900">🔑 अकाउंट सुरक्षा व पासवर्ड</h3>
+          <p class="text-[11px] text-slate-500">Firebase Auth द्वारा सुरक्षित — यहीं से पासवर्ड बदलें या रीसेट करें</p>
         </div>
         <button id="close-school-cred-btn" class="text-slate-400 hover:text-slate-600 p-1">✕</button>
       </div>
 
       <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-1">
-        <div class="flex justify-between"><span class="text-amber-900 font-medium">वर्तमान यूजर ID:</span><strong id="cred-current-id-display" class="font-mono text-slate-900"></strong></div>
-        <div class="flex justify-between"><span class="text-amber-900 font-medium">वर्तमान पासवर्ड:</span><strong id="cred-current-pass-display" class="font-mono text-emerald-700"></strong></div>
+        <div class="flex justify-between"><span class="text-amber-900 font-medium">लॉगिन Gmail ID:</span><strong id="cred-current-email-display" class="font-mono text-slate-900"></strong></div>
+        <div class="flex justify-between"><span class="text-amber-900 font-medium">स्कूल कोड ID:</span><strong id="cred-current-id-display" class="font-mono text-brand-700"></strong></div>
       </div>
 
       <form id="school-cred-form" class="space-y-3 text-xs sm:text-sm">
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">नई या वर्तमान यूजर ID (बिना स्पेस) *</label>
-          <input type="text" id="cred-new-userid" required placeholder="अपनी यूजर ID लिखें" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">वर्तमान पासवर्ड *</label>
+          <input type="password" id="cred-current-password" required placeholder="अपना वर्तमान पासवर्ड लिखें" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500">
         </div>
         <div>
-          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">नया पासवर्ड *</label>
-          <input type="text" id="cred-new-password" required minlength="3" placeholder="नया पासवर्ड लिखें" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono font-bold outline-none focus:ring-2 focus:ring-brand-500">
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">नया पासवर्ड (कम से कम 6 अक्षर) *</label>
+          <input type="password" id="cred-new-password" required minlength="6" placeholder="नया मजबूत पासवर्ड लिखें" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500">
         </div>
-        <p class="text-[11px] text-slate-500">नोट: इसे सेव करते ही आपकी नई ID और पासवर्ड हमेशा के लिए अपडेट हो जाएंगे।</p>
-        <div class="flex justify-end space-x-2 pt-3 border-t border-slate-100">
-          <button type="button" id="cancel-school-cred-btn" class="px-4 py-2 text-xs font-medium text-slate-700 bg-slate-100 rounded-lg">रद्द करें</button>
-          <button type="submit" id="save-school-cred-submit-btn" class="px-5 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow">अपडेट व सेव करें</button>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">नए पासवर्ड की पुष्टि करें *</label>
+          <input type="password" id="cred-confirm-password" required minlength="6" placeholder="नया पासवर्ड दोबारा लिखें" class="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-brand-500">
+        </div>
+        <div class="flex flex-wrap justify-between items-center gap-2 pt-3 border-t border-slate-100">
+          <button type="button" id="school-send-reset-link-btn" class="px-3 py-2 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg">
+            📧 Gmail रीसेट लिंक
+          </button>
+          <div class="flex space-x-2">
+            <button type="button" id="cancel-school-cred-btn" class="px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 rounded-lg">रद्द करें</button>
+            <button type="submit" id="save-school-cred-submit-btn" class="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow">पासवर्ड बदलें</button>
+          </div>
         </div>
       </form>
     </div>
@@ -1169,7 +1308,35 @@
 
   <!-- JavaScript Engine -->
   <script>
-    const FIREBASE_DB_URL = "https://fees-flow-f4f47-default-rtdb.firebaseio.com";
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyDL2Ts1oww8GQoLG5ims5HLPbz_dnpIO6E",
+      authDomain: "fees-flow-f4f47.firebaseapp.com",
+      databaseURL: "https://fees-flow-f4f47-default-rtdb.firebaseio.com",
+      projectId: "fees-flow-f4f47",
+      storageBucket: "fees-flow-f4f47.firebasestorage.app",
+      messagingSenderId: "1084117077213",
+      appId: "1:1084117077213:web:646851a1487107b8dc1f34"
+    };
+    const FIREBASE_DB_URL = FIREBASE_CONFIG.databaseURL;
+    const SUPER_ADMIN_EMAIL = "sanoreeta7898@gmail.com";
+    const LIVE_APP_URL = "https://sanoreeta7898-maker.github.io/feesflow-pro/";
+    const FREE_TRIAL_DAYS = 3;
+
+    // Initialize Primary & Secondary Firebase Auth Apps
+    const fbApp = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
+    const fbAuth = fbApp.auth();
+    let secondaryFbApp = null;
+    function getSecondaryAuth() {
+      if (!secondaryFbApp) {
+        secondaryFbApp = firebase.apps.find(a => a.name === "SchoolCreator") || firebase.initializeApp(FIREBASE_CONFIG, "SchoolCreator");
+      }
+      return secondaryFbApp.auth();
+    }
+
+    // Track in-flight auth actions to avoid onAuthStateChanged race conditions
+    let isAuthActionInProgress = false;
+    // Temporary RAM-only map for freshly created school initial passwords (never saved to DB/storage)
+    const tempCreatedPasswords = {};
 
     function safeSetSession(key, val) {
       try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
@@ -1188,6 +1355,10 @@
       try { sessionStorage.removeItem(key); } catch (e) {}
     }
 
+    // Clean up any legacy plain-text saved credentials from earlier versions
+    safeRemoveSession("ff_saved_creds");
+    safeRemoveSession("ff_session");
+
     const DEFAULT_SESSIONS = ["2026-27", "2025-26", "2024-25"];
 
     let appState = {
@@ -1195,8 +1366,6 @@
       role: null,
       isPreviewingFromSA: false,
       masterConfig: {
-        adminUser: "sanjeev",
-        adminPass: "admin2026",
         devContact: "संजीव साहू (सॉफ्टवेयर एडमिन)",
         adminWhatsapp: "",
         adminUpi: "",
@@ -1219,35 +1388,53 @@
       deleteAction: null
     };
 
-    async function fbGet(path) {
-      const res = await fetch(`${FIREBASE_DB_URL}/${path}.json`);
-      if (!res.ok) throw new Error("Firebase GET failed");
+    async function getAuthQuery(forcePublic = false) {
+      if (forcePublic) return "";
+      const user = fbAuth.currentUser;
+      if (!user) return "";
+      const token = await user.getIdToken();
+      return `?auth=${encodeURIComponent(token)}`;
+    }
+
+    async function fbGet(path, forcePublic = false) {
+      const q = await getAuthQuery(forcePublic);
+      const res = await fetch(`${FIREBASE_DB_URL}/${path}.json${q}`);
+      if (!res.ok) throw new Error(`Firebase GET failed (${res.status})`);
       return await res.json();
     }
 
     async function fbPut(path, data) {
-      const res = await fetch(`${FIREBASE_DB_URL}/${path}.json`, {
+      const q = await getAuthQuery(false);
+      const res = await fetch(`${FIREBASE_DB_URL}/${path}.json${q}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error("Firebase PUT failed");
+      if (!res.ok) throw new Error(`Firebase PUT failed (${res.status})`);
       return await res.json();
     }
 
     async function fbPatch(path, data) {
-      const res = await fetch(`${FIREBASE_DB_URL}/${path}.json`, {
+      const q = await getAuthQuery(false);
+      const res = await fetch(`${FIREBASE_DB_URL}/${path}.json${q}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data)
       });
-      if (!res.ok) throw new Error("Firebase PATCH failed");
+      if (!res.ok) throw new Error(`Firebase PATCH failed (${res.status})`);
       return await res.json();
     }
 
     async function fbDelete(path) {
-      const res = await fetch(`${FIREBASE_DB_URL}/${path}.json`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Firebase DELETE failed");
+      const q = await getAuthQuery(false);
+      const res = await fetch(`${FIREBASE_DB_URL}/${path}.json${q}`, { method: "DELETE" });
+      if (!res.ok) throw new Error(`Firebase DELETE failed (${res.status})`);
+    }
+
+    function dateStrToExpiryTs(dateStr) {
+      if (!dateStr) return Date.now() + 365 * 86400000;
+      const d = new Date(dateStr + "T23:59:59+05:30");
+      return isNaN(d.getTime()) ? Date.now() + 365 * 86400000 : d.getTime();
     }
 
     function showToast(message, type = "success") {
@@ -1374,77 +1561,275 @@
       window.open(url, "_blank");
     }
 
-    async function ensureMasterConfig() {
-      try {
-        const remote = await fbGet("master_config");
-        if (remote && remote.adminUser && remote.adminPass) {
-          appState.masterConfig = remote;
-        } else {
-          await fbPut("master_config", appState.masterConfig);
-        }
-      } catch (err) {}
-    }
-
-    async function handleLoginSubmit(userId, password) {
-      const btnLabel = document.getElementById("login-btn-label");
+    function showAuthAlert(msg, isSuccess = false) {
       const errBox = document.getElementById("login-error-box");
       const errText = document.getElementById("login-error-text");
+      const okBox = document.getElementById("login-success-box");
+      const okText = document.getElementById("login-success-text");
+      if (isSuccess) {
+        errBox.classList.add("hidden");
+        okText.textContent = msg;
+        okBox.classList.remove("hidden");
+      } else {
+        okBox.classList.add("hidden");
+        errText.textContent = msg;
+        errBox.classList.remove("hidden");
+      }
+    }
 
+    function clearAuthAlerts() {
+      document.getElementById("login-error-box").classList.add("hidden");
+      document.getElementById("login-success-box").classList.add("hidden");
+    }
+
+    function mapFirebaseAuthError(err) {
+      const code = err?.code || "";
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        return "गलत Gmail ID या पासवर्ड! पासवर्ड भूल गए हों तो 'पासवर्ड भूल गए?' दबाएं।";
+      }
+      if (code === "auth/email-already-in-use") {
+        return "यह Gmail ID पहले से रजिस्टर है! कृपया लॉग-इन टैब से लॉग-इन करें।";
+      }
+      if (code === "auth/weak-password") {
+        return "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।";
+      }
+      if (code === "auth/invalid-email") {
+        return "कृपया सही Gmail ID लिखें (उदा. school@gmail.com)।";
+      }
+      if (code === "auth/too-many-requests") {
+        return "बहुत ज़्यादा प्रयास किए गए! कृपया 1-2 मिनट बाद पुनः प्रयास करें।";
+      }
+      if (code === "auth/network-request-failed") {
+        return "कृपया मोबाइल का इंटरनेट (Data) चालू करें और पुनः प्रयास करें।";
+      }
+      return err?.message || "लॉगिन में त्रुटि आई, कृपया पुनः प्रयास करें।";
+    }
+
+    // Bruteforce login attempt guard (5 failed tries -> 60s lock)
+    function checkLoginRateLimit() {
+      const guard = safeGetSession("ff_login_guard") || { count: 0, lockedUntil: 0 };
+      const now = Date.now();
+      if (guard.lockedUntil && now < guard.lockedUntil) {
+        const secs = Math.ceil((guard.lockedUntil - now) / 1000);
+        return { blocked: true, secs };
+      }
+      return { blocked: false, secs: 0 };
+    }
+    function recordLoginFailure() {
+      const guard = safeGetSession("ff_login_guard") || { count: 0, lockedUntil: 0 };
+      const count = (guard.count || 0) + 1;
+      const lockedUntil = count >= 5 ? Date.now() + 60000 : 0;
+      safeSetSession("ff_login_guard", { count: count >= 5 ? 0 : count, lockedUntil });
+      return lockedUntil > 0;
+    }
+    function clearLoginFailures() {
+      safeRemoveSession("ff_login_guard");
+    }
+
+    async function ensureMasterConfig() {
+      try {
+        const pub = await fbGet("public_config", true);
+        if (pub && typeof pub === "object") {
+          appState.masterConfig = { ...appState.masterConfig, ...pub };
+          return;
+        }
+      } catch (e) {}
+    }
+
+    async function syncPublicConfigAsSuperAdmin() {
+      try {
+        const pub = await fbGet("public_config", false);
+        if (pub && typeof pub === "object") {
+          appState.masterConfig = { ...appState.masterConfig, ...pub };
+          return;
+        }
+        // One-time migration from legacy master_config -> public_config (stripping old credentials)
+        const legacy = await fbGet("master_config", false).catch(() => null);
+        const cleanPublic = {
+          devContact: legacy?.devContact || appState.masterConfig.devContact,
+          adminWhatsapp: legacy?.adminWhatsapp || "",
+          adminUpi: legacy?.adminUpi || "",
+          monthlyPrice: Number(legacy?.monthlyPrice) || 299,
+          yearlyPrice: Number(legacy?.yearlyPrice) || 1999
+        };
+        appState.masterConfig = cleanPublic;
+        await fbPut("public_config", cleanPublic);
+        if (legacy && (legacy.adminPass || legacy.adminUser)) {
+          await fbPut("master_config", { migratedToFirebaseAuth: true, updatedAt: new Date().toISOString() });
+        }
+      } catch (e) {}
+    }
+
+    function showEmailVerifyScreen(email) {
+      document.getElementById("auth-lock-overlay").classList.add("hidden");
+      document.getElementById("super-admin-view").classList.add("hidden");
+      document.getElementById("school-app-view").classList.add("hidden");
+      document.getElementById("school-locked-overlay").classList.add("hidden");
+      document.getElementById("verify-email-display").textContent = email || "";
+      document.getElementById("email-verify-overlay").classList.remove("hidden");
+    }
+
+    async function routeAuthenticatedUser(user) {
+      if (!user) return;
+      await ensureMasterConfig();
+      const email = (user.email || "").toLowerCase().trim();
+
+      // 1. SUPER ADMIN ROUTE
+      if (email === SUPER_ADMIN_EMAIL) {
+        if (!user.emailVerified) {
+          try { await user.sendEmailVerification(); } catch (e) {}
+          showEmailVerifyScreen(email);
+          return;
+        }
+        appState.role = "superadmin";
+        appState.isPreviewingFromSA = false;
+        await syncPublicConfigAsSuperAdmin();
+        await openSuperAdminRoom();
+        return;
+      }
+
+      // 2. SCHOOL USER ROUTE
+      let schoolId = null;
+      try {
+        schoolId = await fbGet(`uid_to_school/${user.uid}`);
+      } catch (e) {}
+      if (!schoolId) schoolId = user.uid;
+
+      let school = null;
+      try {
+        school = await fbGet(`schools/${schoolId}`);
+      } catch (e) {}
+
+      if (!school) {
+        await fbAuth.signOut();
+        showAuthAlert("आपका स्कूल अकाउंट सिस्टम में नहीं मिला या एडमिन द्वारा हटा दिया गया है। कृपया एडमिन से संपर्क करें।");
+        document.getElementById("auth-lock-overlay").classList.remove("hidden");
+        return;
+      }
+
+      // Require Gmail verification for self-signup trial schools (free OTP verification)
+      if (!school.createdByAdmin && !user.emailVerified) {
+        showEmailVerifyScreen(email);
+        return;
+      }
+
+      if (!verifySchoolAccess(school)) {
+        return;
+      }
+
+      appState.role = "school";
+      appState.isPreviewingFromSA = false;
+      appState.activeSchool = school;
+      await loadSchoolDataAndOpen(school);
+    }
+
+    async function handleLoginSubmit(emailRaw, password) {
+      const limit = checkLoginRateLimit();
+      if (limit.blocked) {
+        showAuthAlert(`सुरक्षा लॉक: 5 बार गलत पासवर्ड डालने के कारण ${limit.secs} सेकंड बाद प्रयास करें।`);
+        return;
+      }
+
+      const btnLabel = document.getElementById("login-btn-label");
+      const btn = document.getElementById("login-submit-btn");
       btnLabel.textContent = "जाँच हो रही है...";
-      errBox.classList.add("hidden");
+      btn.disabled = true;
+      clearAuthAlerts();
+      isAuthActionInProgress = true;
 
       try {
-        await ensureMasterConfig();
-
         const rememberMe = document.getElementById("remember-me-checkbox")?.checked;
-        if (userId.toLowerCase() === appState.masterConfig.adminUser.toLowerCase() && password === appState.masterConfig.adminPass) {
-          appState.role = "superadmin";
-          appState.isPreviewingFromSA = false;
-          if (rememberMe) {
-            safeSetSession("ff_session", { role: "superadmin" });
-            safeSetSession("ff_saved_creds", { userId, password });
-          } else {
-            safeRemoveSession("ff_saved_creds");
-          }
-          await openSuperAdminRoom();
-          showToast("स्वागत है सुपर एडमिन!");
-          return;
-        }
-
-        const cleanId = userId.toLowerCase().trim().replace(/[^a-z0-9_-]/g, "");
-        if (!cleanId) {
-          errText.textContent = "गलत यूजर आईडी या पासवर्ड!";
-          errBox.classList.remove("hidden");
-          return;
-        }
-
-        const school = await fbGet(`schools/${cleanId}`);
-        if (!school || school.password !== password) {
-          errText.textContent = "गलत यूजर आईडी या पासवर्ड! कृपया एडमिन से संपर्क करें।";
-          errBox.classList.remove("hidden");
-          return;
-        }
-
-        if (!verifySchoolAccess(school)) {
-          return;
-        }
-
-        appState.role = "school";
-        appState.isPreviewingFromSA = false;
-        appState.activeSchool = school;
-        if (rememberMe) {
-          safeSetSession("ff_session", { role: "school", schoolId: school.schoolId });
-          safeSetSession("ff_saved_creds", { userId: school.schoolId, password });
-        } else {
-          safeRemoveSession("ff_saved_creds");
-        }
-        await loadSchoolDataAndOpen(school);
-        showToast(`स्वागत है! ${school.schoolName}`);
+        await fbAuth.setPersistence(
+          rememberMe ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION
+        );
+        const cred = await fbAuth.signInWithEmailAndPassword(emailRaw.toLowerCase().trim(), password);
+        clearLoginFailures();
+        await routeAuthenticatedUser(cred.user);
+        if (appState.role === "superadmin") showToast("स्वागत है सुपर एडमिन!");
+        else if (appState.role === "school" && appState.activeSchool) showToast(`स्वागत है! ${appState.activeSchool.schoolName}`);
       } catch (e) {
-        errText.textContent = "कृपया मोबाइल का इंटरनेट (Data) चालू करें और पुनः प्रयास करें।";
-        errBox.classList.remove("hidden");
+        const justLocked = recordLoginFailure();
+        if (justLocked) {
+          showAuthAlert("लगातार 5 बार गलत प्रयास! सुरक्षा के लिए लॉगिन 60 सेकंड के लिए लॉक हो गया है।");
+        } else {
+          showAuthAlert(mapFirebaseAuthError(e));
+        }
       } finally {
+        isAuthActionInProgress = false;
         btnLabel.textContent = "लॉग-इन करें (Login)";
+        btn.disabled = false;
+      }
+    }
+
+    async function handleSignupSubmit() {
+      const email = document.getElementById("signup-email").value.toLowerCase().trim();
+      const pass = document.getElementById("signup-password").value;
+      const confirmPass = document.getElementById("signup-confirm-password").value;
+      const isAdminEmail = (email === SUPER_ADMIN_EMAIL);
+      const schoolName = document.getElementById("signup-school-name").value.trim();
+      const phone = document.getElementById("signup-phone").value.trim();
+
+      clearAuthAlerts();
+      if (pass !== confirmPass) {
+        showAuthAlert("दोनों पासवर्ड एक जैसे नहीं हैं! कृपया जांचें।");
+        return;
+      }
+      if (!isAdminEmail && (!schoolName || !phone)) {
+        showAuthAlert("कृपया स्कूल का नाम और मोबाइल नंबर दर्ज करें।");
+        return;
+      }
+
+      const btn = document.getElementById("signup-submit-btn");
+      const btnLabel = document.getElementById("signup-btn-label");
+      const origTxt = btnLabel.textContent;
+      btnLabel.textContent = "अकाउंट बन रहा है...";
+      btn.disabled = true;
+      isAuthActionInProgress = true;
+
+      try {
+        await fbAuth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+        const cred = await fbAuth.createUserWithEmailAndPassword(email, pass);
+        const user = cred.user;
+
+        if (!isAdminEmail) {
+          const nowMs = Date.now();
+          const trialMs = FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000;
+          const expiryTimestamp = nowMs + trialMs;
+          const expiryDate = new Date(expiryTimestamp).toISOString().split("T")[0];
+          const today = new Date(nowMs).toISOString().split("T")[0];
+
+          const schoolObj = {
+            schoolId: user.uid,
+            ownerUid: user.uid,
+            email: email,
+            schoolName: schoolName,
+            schoolAddress: phone ? `मो. ${phone}` : "",
+            phone: phone,
+            upiId: "",
+            expiryDate: expiryDate,
+            expiryTimestamp: expiryTimestamp,
+            active: true,
+            isTrial: true,
+            createdByAdmin: false,
+            createdAt: today
+          };
+
+          await fbPut(`schools/${user.uid}`, schoolObj);
+          await fbPut(`uid_to_school/${user.uid}`, user.uid);
+        }
+
+        try {
+          await user.sendEmailVerification();
+        } catch (ve) {}
+
+        showEmailVerifyScreen(email);
+        showToast("अकाउंट बन गया! अपनी Gmail पर भेजा गया वेरिफिकेशन लिंक क्लिक करें।");
+      } catch (e) {
+        showAuthAlert(mapFirebaseAuthError(e));
+      } finally {
+        isAuthActionInProgress = false;
+        btnLabel.textContent = origTxt;
+        btn.disabled = false;
       }
     }
 
@@ -1458,16 +1843,22 @@
         document.getElementById("lock-reason-title").textContent = "आपकी सेवा अस्थायी रूप से रोक दी गई है";
         document.getElementById("lock-reason-desc").textContent = "आपका सारा डेटा सुरक्षित है। सेवा दोबारा चालू (ON) कराने के लिए एडमिन से संपर्क करें।";
         document.getElementById("auth-lock-overlay").classList.add("hidden");
+        document.getElementById("email-verify-overlay").classList.add("hidden");
         document.getElementById("school-app-view").classList.add("hidden");
         lockOverlay.classList.remove("hidden");
         return false;
       }
 
-      if (school.expiryDate && school.expiryDate < today) {
-        document.getElementById("lock-reason-badge").textContent = "लाइसेंस समाप्त (Expired)";
-        document.getElementById("lock-reason-title").textContent = "आपका सॉफ्टवेयर प्लान समाप्त हो गया है";
-        document.getElementById("lock-reason-desc").textContent = `समाप्ति दिनांक: ${school.expiryDate}। रिन्यू कराने के लिए एडमिन से संपर्क करें।`;
+      const isDateExpired = school.expiryDate && school.expiryDate < today;
+      const isTsExpired = school.expiryTimestamp && Date.now() > Number(school.expiryTimestamp);
+      if (isDateExpired || isTsExpired) {
+        document.getElementById("lock-reason-badge").textContent = school.isTrial ? "3-दिन फ्री ट्रायल समाप्त" : "लाइसेंस समाप्त (Expired)";
+        document.getElementById("lock-reason-title").textContent = school.isTrial
+          ? "आपका 3 दिन का फ्री ट्रायल समाप्त हो गया है"
+          : "आपका सॉफ्टवेयर प्लान समाप्त हो गया है";
+        document.getElementById("lock-reason-desc").textContent = `समाप्ति दिनांक: ${school.expiryDate || ""}। आपका सारा डेटा सुरक्षित है — जारी रखने के लिए नीचे से प्लान रिन्यू करें।`;
         document.getElementById("auth-lock-overlay").classList.add("hidden");
+        document.getElementById("email-verify-overlay").classList.add("hidden");
         document.getElementById("school-app-view").classList.add("hidden");
         lockOverlay.classList.remove("hidden");
         return false;
@@ -1477,28 +1868,25 @@
       return true;
     }
 
-    function logoutAll() {
+    async function logoutAll() {
       appState.role = null;
       appState.activeSchool = null;
       appState.isPreviewingFromSA = false;
-      safeRemoveSession("ff_session");
+      try { await fbAuth.signOut(); } catch (e) {}
       document.getElementById("super-admin-view").classList.add("hidden");
       document.getElementById("school-app-view").classList.add("hidden");
       document.getElementById("school-locked-overlay").classList.add("hidden");
+      document.getElementById("email-verify-overlay").classList.add("hidden");
       document.getElementById("login-form").reset();
-      const savedCreds = safeGetSession("ff_saved_creds");
-      if (savedCreds) {
-        document.getElementById("login-userid-input").value = savedCreds.userId || "";
-        document.getElementById("login-password-input").value = savedCreds.password || "";
-        document.getElementById("remember-me-checkbox").checked = true;
-      }
-      document.getElementById("login-error-box").classList.add("hidden");
+      document.getElementById("signup-form").reset();
+      clearAuthAlerts();
       document.getElementById("auth-lock-overlay").classList.remove("hidden");
-      showToast("लॉगआउट हो गया!");
+      showToast("सुरक्षित लॉगआउट हो गया!");
     }
 
     async function openSuperAdminRoom() {
       document.getElementById("auth-lock-overlay").classList.add("hidden");
+      document.getElementById("email-verify-overlay").classList.add("hidden");
       document.getElementById("school-app-view").classList.add("hidden");
       document.getElementById("school-locked-overlay").classList.add("hidden");
       document.getElementById("super-admin-view").classList.remove("hidden");
@@ -1527,7 +1915,7 @@
       let lockedCount = 0;
 
       list.forEach(s => {
-        const isExpired = s.expiryDate && s.expiryDate < today;
+        const isExpired = (s.expiryDate && s.expiryDate < today) || (s.expiryTimestamp && Date.now() > Number(s.expiryTimestamp));
         if (s.active && !isExpired) activeCount++;
         else lockedCount++;
       });
@@ -1543,25 +1931,26 @@
       emptyState.classList.add("hidden");
 
       list.forEach(s => {
-        const isExpired = s.expiryDate && s.expiryDate < today;
+        const isExpired = (s.expiryDate && s.expiryDate < today) || (s.expiryTimestamp && Date.now() > Number(s.expiryTimestamp));
         const diffDays = s.expiryDate ? Math.ceil((new Date(s.expiryDate) - new Date(today)) / 86400000) : 0;
+        const trialBadge = s.isTrial ? `<span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 font-extrabold">🎁 3-दिन ट्रायल</span>` : "";
+        const authInfo = s.ownerUid
+          ? `<div class="text-brand-700 font-bold break-all">📧 ${s.email || "-"}</div><div class="text-[10px] text-emerald-700 font-bold">🔒 Firebase Auth सुरक्षित</div>`
+          : `<div class="text-slate-700">ID: <strong>${s.schoolId}</strong></div><div class="text-[10px] text-orange-700 font-extrabold bg-orange-50 inline-block px-1.5 py-0.5 rounded border border-orange-200 mt-0.5">⚠️ एडिट करके Gmail लिंक करें</div>`;
 
         const tr = document.createElement("tr");
         tr.className = "hover:bg-slate-50 border-b border-slate-100";
         tr.innerHTML = `
           <td class="py-3.5 pl-4 sm:pl-6">
-            <div class="font-extrabold text-slate-900">${s.schoolName}</div>
+            <div class="font-extrabold text-slate-900">${s.schoolName}${trialBadge}</div>
             <div class="text-[11px] text-slate-500">${s.schoolAddress || ""} ${s.upiId ? "• UPI: " + s.upiId : ""}</div>
           </td>
-          <td class="px-3 py-3.5 font-mono text-xs">
-            <div>ID: <strong class="text-brand-700">${s.schoolId}</strong></div>
-            <div>Pass: <strong class="text-slate-800">${s.password}</strong></div>
-          </td>
+          <td class="px-3 py-3.5 font-mono text-xs">${authInfo}</td>
           <td class="px-3 py-3.5 text-xs">
             <div class="font-mono font-bold ${isExpired ? "text-rose-600" : "text-slate-800"}">${s.expiryDate || "-"}</div>
             <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${
               isExpired ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
-            }">${isExpired ? "समाप्त (Expired)" : diffDays + " दिन शेष"}</span>
+            }">${isExpired ? "समाप्त (Expired)" : Math.max(0, diffDays) + " दिन शेष"}</span>
           </td>
           <td class="px-3 py-3.5 text-center">
             <button class="sa-toggle-switch-btn px-3 py-1.5 rounded-full text-xs font-extrabold shadow-sm transition ${
@@ -1573,10 +1962,10 @@
           <td class="py-3.5 pr-4 sm:pr-6 text-center">
             <div class="inline-flex flex-wrap justify-center gap-1">
               <button class="sa-share-wa-btn px-2.5 py-1 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-md" data-id="${s.schoolId}">
-                WhatsApp पर ID भेजें
+                WhatsApp भेजें
               </button>
               <button class="sa-open-dash-btn px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-md" data-id="${s.schoolId}">
-                डैशबोर्ड खोलें
+                डैशबोर्ड
               </button>
               <button class="sa-edit-school-btn px-2 py-1 text-xs font-semibold text-amber-800 bg-amber-100 hover:bg-amber-200 rounded-md" data-id="${s.schoolId}">
                 एडिट
@@ -1596,14 +1985,35 @@
       const form = document.getElementById("sa-school-form");
       form.reset();
 
+      const emailInp = document.getElementById("sa-form-school-email");
+      const passWrap = document.getElementById("sa-form-pass-wrap");
+      const passInp = document.getElementById("sa-form-school-pass");
+      const resetWrap = document.getElementById("sa-form-reset-wrap");
+      const migrateNotice = document.getElementById("sa-migrate-notice");
+
       if (schoolId && appState.allSchools[schoolId]) {
         const s = appState.allSchools[schoolId];
-        document.getElementById("sa-school-modal-title").textContent = "स्कूल सेटिंग्स एडिट करें";
+        const hasAuth = !!s.ownerUid;
+        document.getElementById("sa-school-modal-title").textContent = hasAuth ? "स्कूल सेटिंग्स एडिट करें" : "पुराना स्कूल सुरक्षित (Gmail लिंक) करें";
         document.getElementById("sa-form-edit-mode").value = "edit";
+        document.getElementById("sa-form-existing-uid").value = s.ownerUid || "";
         document.getElementById("sa-form-school-name").value = s.schoolName;
         document.getElementById("sa-form-school-id").value = s.schoolId;
         document.getElementById("sa-form-school-id").disabled = true;
-        document.getElementById("sa-form-school-pass").value = s.password;
+        emailInp.value = s.email || "";
+        emailInp.disabled = hasAuth;
+        if (hasAuth) {
+          passWrap.classList.add("hidden");
+          passInp.required = false;
+          resetWrap.classList.remove("hidden");
+          migrateNotice.classList.add("hidden");
+        } else {
+          passWrap.classList.remove("hidden");
+          passInp.required = true;
+          passInp.value = "";
+          resetWrap.classList.add("hidden");
+          migrateNotice.classList.remove("hidden");
+        }
         document.getElementById("sa-form-school-address").value = s.schoolAddress || "";
         document.getElementById("sa-form-school-upi").value = s.upiId || "";
         document.getElementById("sa-form-expiry").value = s.expiryDate || "";
@@ -1612,7 +2022,13 @@
       } else {
         document.getElementById("sa-school-modal-title").textContent = "+ नया कस्टमर स्कूल जोड़ें";
         document.getElementById("sa-form-edit-mode").value = "new";
+        document.getElementById("sa-form-existing-uid").value = "";
         document.getElementById("sa-form-school-id").disabled = false;
+        emailInp.disabled = false;
+        passWrap.classList.remove("hidden");
+        passInp.required = true;
+        resetWrap.classList.add("hidden");
+        migrateNotice.classList.add("hidden");
         const nextYear = new Date();
         nextYear.setDate(nextYear.getDate() + 365);
         document.getElementById("sa-form-expiry").value = nextYear.toISOString().split("T")[0];
@@ -1882,7 +2298,7 @@
       setTxt("header-collect-btn", "+ फीस लें", "+ Collect Fee");
       setTxt("header-add-student-btn", "+ छात्र", "+ Student");
       setTxt("header-school-setup-btn", "📱 UPI & पता", "📱 UPI & Info");
-      setTxt("header-school-cred-btn", "🔑 ID व पासवर्ड", "🔑 ID & Pass");
+      setTxt("header-school-cred-btn", "🔑 पासवर्ड / सुरक्षा", "🔑 Security");
       setTxt("header-sync-now-btn", "↻ सिंक", "↻ Sync");
       setTxt("header-logout-btn", "लॉगआउट", "Logout");
 
@@ -2471,27 +2887,62 @@
     }
 
     document.addEventListener("DOMContentLoaded", async () => {
-      const savedCreds = safeGetSession("ff_saved_creds");
-      if (savedCreds) {
-        document.getElementById("login-userid-input").value = savedCreds.userId || "";
-        document.getElementById("login-password-input").value = savedCreds.password || "";
+      // Load public pricing/support info for login & buy-plan screens
+      ensureMasterConfig();
+
+      // Switch between Login, 3-Day Free Trial Signup, and Forgot Password panels
+      function setAuthPanel(panel) {
+        clearAuthAlerts();
+        const loginForm = document.getElementById("login-form");
+        const signupForm = document.getElementById("signup-form");
+        const forgotForm = document.getElementById("forgot-form");
+        const tabsBar = document.getElementById("auth-mode-tabs");
+        const tabLogin = document.getElementById("auth-tab-login");
+        const tabSignup = document.getElementById("auth-tab-signup");
+
+        loginForm.classList.toggle("hidden", panel !== "login");
+        signupForm.classList.toggle("hidden", panel !== "signup");
+        forgotForm.classList.toggle("hidden", panel !== "forgot");
+        tabsBar.classList.toggle("hidden", panel === "forgot");
+
+        if (panel === "login") {
+          tabLogin.className = "py-2 text-xs font-extrabold rounded-lg bg-brand-600 text-white shadow-sm transition";
+          tabSignup.className = "py-2 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition";
+        } else if (panel === "signup") {
+          tabSignup.className = "py-2 text-xs font-extrabold rounded-lg bg-emerald-600 text-white shadow-sm transition";
+          tabLogin.className = "py-2 text-xs font-bold rounded-lg text-slate-600 hover:text-slate-900 transition";
+        }
       }
-      const savedSession = safeGetSession("ff_session");
-      if (savedSession) {
-        try {
-          await ensureMasterConfig();
-          if (savedSession.role === "superadmin") {
-            appState.role = "superadmin";
-            await openSuperAdminRoom();
-          } else if (savedSession.role === "school" && savedSession.schoolId) {
-            const school = await fbGet(`schools/${savedSession.schoolId}`);
-            if (school && verifySchoolAccess(school)) {
-              appState.role = "school";
-              await loadSchoolDataAndOpen(school);
-            }
-          }
-        } catch (e) {}
-      }
+
+      document.getElementById("auth-tab-login").addEventListener("click", () => setAuthPanel("login"));
+      document.getElementById("auth-tab-signup").addEventListener("click", () => setAuthPanel("signup"));
+      document.getElementById("open-forgot-pass-btn").addEventListener("click", () => {
+        const typedEmail = document.getElementById("login-userid-input").value.trim();
+        if (typedEmail) document.getElementById("forgot-email-input").value = typedEmail;
+        setAuthPanel("forgot");
+      });
+      document.getElementById("back-to-login-from-forgot-btn").addEventListener("click", () => setAuthPanel("login"));
+
+      // Smart first-time Super Admin setup detection on Signup form
+      document.getElementById("signup-email").addEventListener("input", (e) => {
+        const isAdmin = e.target.value.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
+        document.getElementById("signup-school-fields").classList.toggle("hidden", isAdmin);
+        document.getElementById("signup-school-name").required = !isAdmin;
+        document.getElementById("signup-phone").required = !isAdmin;
+        document.getElementById("signup-btn-label").textContent = isAdmin
+          ? "👑 सुपर एडमिन अकाउंट सेटअप करें"
+          : "🎁 3 दिन फ्री ट्रायल शुरू करें";
+      });
+
+      // Firebase Auth Auto-Login Listener (No plain-text password stored!)
+      fbAuth.onAuthStateChanged(async (user) => {
+        if (isAuthActionInProgress) return;
+        if (user) {
+          try {
+            await routeAuthenticatedUser(user);
+          } catch (e) {}
+        }
+      });
 
       document.getElementById("login-form").addEventListener("submit", (e) => {
         e.preventDefault();
@@ -2500,6 +2951,70 @@
           document.getElementById("login-password-input").value
         );
       });
+
+      document.getElementById("signup-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        handleSignupSubmit();
+      });
+
+      document.getElementById("forgot-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const email = document.getElementById("forgot-email-input").value.toLowerCase().trim();
+        const btn = document.getElementById("forgot-submit-btn");
+        btn.disabled = true;
+        btn.textContent = "लिंक भेजा जा रहा है...";
+        clearAuthAlerts();
+        try {
+          await fbAuth.sendPasswordResetEmail(email);
+          showAuthAlert(`✅ ${email} पर पासवर्ड रीसेट लिंक भेज दिया गया है! अपना Gmail (Inbox या Spam) चेक करें।`, true);
+        } catch (err) {
+          showAuthAlert(mapFirebaseAuthError(err));
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "📧 पासवर्ड रीसेट लिंक Gmail पर भेजें";
+        }
+      });
+
+      // Email Verification Overlay Buttons
+      document.getElementById("verify-check-btn").addEventListener("click", async () => {
+        const user = fbAuth.currentUser;
+        if (!user) { logoutAll(); return; }
+        const btn = document.getElementById("verify-check-btn");
+        btn.disabled = true;
+        btn.textContent = "जाँच हो रही है...";
+        try {
+          await user.reload();
+          await user.getIdToken(true);
+          if (fbAuth.currentUser && fbAuth.currentUser.emailVerified) {
+            document.getElementById("email-verify-overlay").classList.add("hidden");
+            await routeAuthenticatedUser(fbAuth.currentUser);
+            showToast("Gmail वेरिफाई हो गई! स्वागत है!");
+          } else {
+            showToast("अभी वेरिफाई नहीं हुआ है — कृपया Gmail में आए लिंक पर क्लिक करें।", "error");
+          }
+        } catch (e) {
+          showToast("जाँच में त्रुटि आई, कृपया पुनः प्रयास करें।", "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "✅ मैंने वेरिफाई कर लिया — आगे बढ़ें";
+        }
+      });
+
+      document.getElementById("verify-resend-btn").addEventListener("click", async () => {
+        const user = fbAuth.currentUser;
+        if (!user) return;
+        const btn = document.getElementById("verify-resend-btn");
+        btn.disabled = true;
+        try {
+          await user.sendEmailVerification();
+          showToast("वेरिफिकेशन लिंक दोबारा भेज दिया गया है! Gmail चेक करें।");
+        } catch (e) {
+          showToast(mapFirebaseAuthError(e), "error");
+        }
+        setTimeout(() => { btn.disabled = false; }, 30000);
+      });
+
+      document.getElementById("verify-logout-btn").addEventListener("click", logoutAll);
 
       document.getElementById("toggle-login-pass-btn").addEventListener("click", () => {
         const inp = document.getElementById("login-password-input");
@@ -2533,42 +3048,102 @@
         document.getElementById("sa-form-active-label").textContent = e.target.checked ? "चालू (ON)" : "बंद (OFF)";
       });
 
+      // Auto-suggest clean database schoolId from School Name when adding new school
+      document.getElementById("sa-form-school-name").addEventListener("input", (e) => {
+        if (document.getElementById("sa-form-edit-mode").value !== "new") return;
+        const idInp = document.getElementById("sa-form-school-id");
+        if (!idInp.dataset.manual) {
+          const slug = e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 22);
+          idInp.value = slug || ("school_" + Date.now().toString().slice(-4));
+        }
+      });
+      document.getElementById("sa-form-school-id").addEventListener("input", (e) => {
+        e.target.dataset.manual = "1";
+      });
+
+      // Super Admin 1-click Send Password Reset Email for an existing linked school
+      document.getElementById("sa-send-school-reset-btn").addEventListener("click", async () => {
+        const email = document.getElementById("sa-form-school-email").value.toLowerCase().trim();
+        if (!email) return;
+        try {
+          await fbAuth.sendPasswordResetEmail(email);
+          showToast(`${email} पर पासवर्ड रीसेट लिंक भेज दिया गया!`);
+        } catch (err) {
+          showToast(mapFirebaseAuthError(err), "error");
+        }
+      });
+
       document.getElementById("sa-school-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         const mode = document.getElementById("sa-form-edit-mode").value;
         const rawId = document.getElementById("sa-form-school-id").value.toLowerCase().trim().replace(/[^a-z0-9_-]/g, "");
-        if (!rawId) { showToast("कृपया सही लॉगिन ID लिखें (अंग्रेजी अक्षर/नंबर)", "error"); return; }
+        const email = document.getElementById("sa-form-school-email").value.toLowerCase().trim();
+        const pass = document.getElementById("sa-form-school-pass").value.trim();
+        let ownerUid = document.getElementById("sa-form-existing-uid").value.trim();
+        const submitBtn = document.getElementById("sa-school-submit-btn");
 
+        if (!rawId) { showToast("कृपया सही डेटाबेस कोड ID लिखें (अंग्रेजी अक्षर/नंबर)", "error"); return; }
+        if (!email) { showToast("कृपया स्कूल की Gmail ID लिखें", "error"); return; }
         if (mode === "new" && appState.allSchools[rawId]) {
-          showToast("यह लॉगिन ID पहले से मौजूद है! दूसरा नाम चुनें।", "error");
+          showToast("यह डेटाबेस कोड ID पहले से मौजूद है! दूसरा नाम चुनें।", "error");
+          return;
+        }
+        if (!ownerUid && pass.length < 6) {
+          showToast("पासवर्ड कम से कम 6 अक्षरों का होना चाहिए!", "error");
           return;
         }
 
-        const schoolObj = {
-          schoolId: rawId,
-          schoolName: document.getElementById("sa-form-school-name").value.trim(),
-          password: document.getElementById("sa-form-school-pass").value.trim(),
-          schoolAddress: document.getElementById("sa-form-school-address").value.trim(),
-          upiId: document.getElementById("sa-form-school-upi").value.trim(),
-          expiryDate: document.getElementById("sa-form-expiry").value,
-          active: document.getElementById("sa-form-active").checked,
-          createdAt: appState.allSchools[rawId]?.createdAt || new Date().toISOString().split("T")[0]
-        };
+        submitBtn.disabled = true;
+        submitBtn.textContent = "सेव हो रहा है...";
 
-        await fbPut(`schools/${rawId}`, schoolObj);
-        document.getElementById("sa-school-modal").classList.add("hidden");
-        await refreshSuperAdminSchools();
-        showToast(`स्कूल "${schoolObj.schoolName}" सेव और लाइव हो गया!`);
+        try {
+          // Create Firebase Auth user via Secondary App so Super Admin stays logged in!
+          if (!ownerUid) {
+            const secAuth = getSecondaryAuth();
+            const cred = await secAuth.createUserWithEmailAndPassword(email, pass);
+            ownerUid = cred.user.uid;
+            await secAuth.signOut();
+            tempCreatedPasswords[rawId] = pass;
+          }
+
+          const expiryDate = document.getElementById("sa-form-expiry").value;
+          const prevSchool = appState.allSchools[rawId] || {};
+          const schoolObj = {
+            schoolId: rawId,
+            ownerUid: ownerUid,
+            email: email,
+            schoolName: document.getElementById("sa-form-school-name").value.trim(),
+            schoolAddress: document.getElementById("sa-form-school-address").value.trim(),
+            upiId: document.getElementById("sa-form-school-upi").value.trim(),
+            expiryDate: expiryDate,
+            expiryTimestamp: dateStrToExpiryTs(expiryDate),
+            active: document.getElementById("sa-form-active").checked,
+            isTrial: false,
+            createdByAdmin: true,
+            createdAt: prevSchool.createdAt || new Date().toISOString().split("T")[0]
+          };
+
+          await fbPut(`schools/${rawId}`, schoolObj);
+          await fbPut(`uid_to_school/${ownerUid}`, rawId);
+          document.getElementById("sa-school-modal").classList.add("hidden");
+          await refreshSuperAdminSchools();
+          showToast(`स्कूल "${schoolObj.schoolName}" Firebase Auth के साथ सुरक्षित सेव हो गया!`);
+        } catch (err) {
+          showToast(mapFirebaseAuthError(err), "error");
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "सेव व लाइव करें";
+        }
       });
 
       document.getElementById("sa-settings-btn").addEventListener("click", () => {
-        document.getElementById("sa-set-user").value = appState.masterConfig.adminUser || "sanjeev";
-        document.getElementById("sa-set-pass").value = appState.masterConfig.adminPass || "admin2026";
+        document.getElementById("sa-admin-email-label").textContent = SUPER_ADMIN_EMAIL;
         document.getElementById("sa-set-contact").value = appState.masterConfig.devContact || "संजीव साहू (सॉफ्टवेयर एडमिन)";
         document.getElementById("sa-set-whatsapp").value = appState.masterConfig.adminWhatsapp || "";
         document.getElementById("sa-set-upi").value = appState.masterConfig.adminUpi || "";
         document.getElementById("sa-set-monthly-price").value = appState.masterConfig.monthlyPrice || 299;
         document.getElementById("sa-set-yearly-price").value = appState.masterConfig.yearlyPrice || 1999;
+        document.getElementById("sa-change-pass-form").reset();
         document.getElementById("sa-settings-modal").classList.remove("hidden");
       });
       document.getElementById("close-sa-settings-modal").addEventListener("click", () => document.getElementById("sa-settings-modal").classList.add("hidden"));
@@ -2577,17 +3152,48 @@
       document.getElementById("sa-settings-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         appState.masterConfig = {
-          adminUser: document.getElementById("sa-set-user").value.trim(),
-          adminPass: document.getElementById("sa-set-pass").value.trim(),
           devContact: document.getElementById("sa-set-contact").value.trim(),
           adminWhatsapp: document.getElementById("sa-set-whatsapp").value.trim(),
           adminUpi: document.getElementById("sa-set-upi").value.trim(),
           monthlyPrice: Number(document.getElementById("sa-set-monthly-price").value) || 299,
           yearlyPrice: Number(document.getElementById("sa-set-yearly-price").value) || 1999
         };
-        await fbPut("master_config", appState.masterConfig);
+        await fbPut("public_config", appState.masterConfig);
         document.getElementById("sa-settings-modal").classList.add("hidden");
-        showToast("मास्टर एडमिन व पेमेंट सेटिंग्स सेव हो गईं!");
+        showToast("पेमेंट और प्लान सेटिंग्स सेव हो गईं!");
+      });
+
+      document.getElementById("sa-change-pass-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const user = fbAuth.currentUser;
+        if (!user) return;
+        const currPass = document.getElementById("sa-curr-pass").value;
+        const newPass = document.getElementById("sa-new-pass").value;
+        const btn = document.getElementById("sa-change-pass-submit-btn");
+        btn.disabled = true;
+        btn.textContent = "बदल रहा है...";
+        try {
+          const cred = firebase.auth.EmailAuthProvider.credential(user.email, currPass);
+          await user.reauthenticateWithCredential(cred);
+          await user.updatePassword(newPass);
+          document.getElementById("sa-change-pass-form").reset();
+          document.getElementById("sa-settings-modal").classList.add("hidden");
+          showToast("सुपर एडमिन पासवर्ड सफलतापूर्वक बदल गया!");
+        } catch (err) {
+          showToast(mapFirebaseAuthError(err), "error");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "पासवर्ड अपडेट करें";
+        }
+      });
+
+      document.getElementById("sa-self-reset-email-btn").addEventListener("click", async () => {
+        try {
+          await fbAuth.sendPasswordResetEmail(SUPER_ADMIN_EMAIL);
+          showToast(`${SUPER_ADMIN_EMAIL} पर पासवर्ड रीसेट लिंक भेज दिया गया!`);
+        } catch (err) {
+          showToast(mapFirebaseAuthError(err), "error");
+        }
       });
 
       // Customer Buy Plan / Payment Gateway Modal Logic
@@ -2662,16 +3268,18 @@
         const utr = document.getElementById("buy-utr-no").value.trim() || "अभी बकाया / स्क्रीनशॉट संलग्न";
         const price = selectedPlanType === "MONTHLY" ? (cfg.monthlyPrice || 299) : (cfg.yearlyPrice || 1999);
         const planTitle = selectedPlanType === "MONTHLY" ? "मासिक प्लान (30 दिन)" : "वार्षिक प्लान (365 दिन)";
+        const loggedEmail = fbAuth.currentUser?.email ? `
+• रजिस्टर्ड Gmail: *${fbAuth.currentUser.email}*` : "";
 
         const msg = `*FeesFlow Pro - नया सब्सक्रिप्शन / रिन्यूअल आर्डर*
 
 • स्कूल का नाम: *${sName}*
-• मोबाइल नंबर: *${sPhone}*
+• मोबाइल नंबर: *${sPhone}*${loggedEmail}
 • चुना गया प्लान: *${planTitle}*
 • राशि: *₹${price}*
 • पेमेंट UTR/Ref: *${utr}*
 
-कृपया हमारी स्कूल लॉगिन ID और पासवर्ड चालू करने का कष्ट करें।`;
+कृपया हमारा स्कूल अकाउंट चालू/रिन्यू करने का कष्ट करें।`;
         openWhatsAppChat(cfg.adminWhatsapp || "", msg);
       });
 
@@ -2724,91 +3332,77 @@
         const s = appState.activeSchool;
         s.schoolAddress = document.getElementById("setup-school-address").value.trim();
         s.upiId = document.getElementById("setup-upi-id").value.trim();
-        await fbPatch(`schools/${s.schoolId}`, { schoolAddress: s.schoolAddress, upiId: s.upiId });
+        await fbPut(`schools/${s.schoolId}/schoolAddress`, s.schoolAddress);
+        await fbPut(`schools/${s.schoolId}/upiId`, s.upiId);
         document.getElementById("school-setup-modal").classList.add("hidden");
         refreshSchoolAppUI();
         showToast("UPI ID और पता सेव हो गया!");
       });
 
-      // School Permanent ID & Password View / Change Modal
+      // School Secure Password Change Modal (Firebase Auth)
       document.getElementById("header-school-cred-btn").addEventListener("click", () => {
         const s = appState.activeSchool;
         if (!s) return;
+        document.getElementById("cred-current-email-display").textContent = s.email || fbAuth.currentUser?.email || "N/A";
         document.getElementById("cred-current-id-display").textContent = s.schoolId;
-        document.getElementById("cred-current-pass-display").textContent = s.password;
-        document.getElementById("cred-new-userid").value = s.schoolId;
-        document.getElementById("cred-new-password").value = s.password;
+        document.getElementById("school-cred-form").reset();
+        const isPreview = appState.isPreviewingFromSA;
+        document.getElementById("cred-current-password").disabled = isPreview;
+        document.getElementById("cred-new-password").disabled = isPreview;
+        document.getElementById("cred-confirm-password").disabled = isPreview;
+        document.getElementById("save-school-cred-submit-btn").disabled = isPreview;
         document.getElementById("school-cred-modal").classList.remove("hidden");
       });
       document.getElementById("close-school-cred-btn").addEventListener("click", () => document.getElementById("school-cred-modal").classList.add("hidden"));
       document.getElementById("cancel-school-cred-btn").addEventListener("click", () => document.getElementById("school-cred-modal").classList.add("hidden"));
 
-      document.getElementById("school-cred-form").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const s = appState.activeSchool;
-        if (!s) return;
-
-        const oldId = s.schoolId;
-        const newId = document.getElementById("cred-new-userid").value.toLowerCase().trim().replace(/[^a-z0-9_-]/g, "");
-        const newPass = document.getElementById("cred-new-password").value.trim();
-        const submitBtn = document.getElementById("save-school-cred-submit-btn");
-
-        if (!newId || !newPass) {
-          showToast("कृपया सही यूजर ID और पासवर्ड लिखें!", "error");
+      document.getElementById("school-send-reset-link-btn").addEventListener("click", async () => {
+        const targetEmail = appState.activeSchool?.email || fbAuth.currentUser?.email;
+        if (!targetEmail) {
+          showToast("इस स्कूल से कोई Gmail लिंक नहीं है!", "error");
           return;
         }
-
-        submitBtn.textContent = "सेव हो रहा है...";
-        submitBtn.disabled = true;
-
         try {
-          if (newId !== oldId) {
-            // Check if newId is already taken by another school
-            const existing = await fbGet(`schools/${newId}`);
-            if (existing) {
-              showToast("यह यूजर ID पहले से किसी अन्य स्कूल के पास है! कृपया दूसरी चुनें।", "error");
-              submitBtn.textContent = "अपडेट व सेव करें";
-              submitBtn.disabled = false;
-              return;
-            }
-            const updatedSchool = { ...s, schoolId: newId, password: newPass };
-            // Save under new ID in Firebase (so Super Admin sees new ID & Password)
-            await fbPut(`schools/${newId}`, updatedSchool);
-            // Move school data to new ID
-            await fbPut(`school_data/${newId}`, {
-              sessions: appState.sessions,
-              currentSession: appState.currentSession,
-              students: appState.students,
-              payments: appState.payments,
-              updatedAt: new Date().toISOString()
-            });
-            // Remove old ID records
-            await fbDelete(`schools/${oldId}`);
-            await fbDelete(`school_data/${oldId}`);
-            appState.activeSchool = updatedSchool;
-          } else {
-            // Same ID, only password updated
-            s.password = newPass;
-            await fbPatch(`schools/${oldId}`, { password: newPass });
-          }
-
-          // Update saved credentials in browser so Auto-Login stays synced
-          if (!appState.isPreviewingFromSA) {
-            safeSetSession("ff_session", { role: "school", schoolId: newId });
-            safeSetSession("ff_saved_creds", { userId: newId, password: newPass });
-          }
-
-          document.getElementById("school-cred-modal").classList.add("hidden");
-          refreshSchoolAppUI();
-          showToast("आपकी नई लॉगिन ID और पासवर्ड सफलतापूर्वक सेव हो गए!");
+          await fbAuth.sendPasswordResetEmail(targetEmail);
+          showToast(`${targetEmail} पर पासवर्ड रीसेट लिंक भेज दिया गया!`);
         } catch (err) {
-          showToast("इंटरनेट समस्या! कृपया दोबारा प्रयास करें।", "error");
-        } finally {
-          submitBtn.textContent = "अपडेट व सेव करें";
-          submitBtn.disabled = false;
+          showToast(mapFirebaseAuthError(err), "error");
         }
       });
 
+      document.getElementById("school-cred-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (appState.isPreviewingFromSA) {
+          showToast("प्रीव्यू मोड में पासवर्ड बदलने के लिए 'Gmail रीसेट लिंक' बटन दबाएं।", "info");
+          return;
+        }
+        const user = fbAuth.currentUser;
+        if (!user) return;
+        const currPass = document.getElementById("cred-current-password").value;
+        const newPass = document.getElementById("cred-new-password").value;
+        const confPass = document.getElementById("cred-confirm-password").value;
+        const submitBtn = document.getElementById("save-school-cred-submit-btn");
+
+        if (newPass !== confPass) {
+          showToast("दोनों नए पासवर्ड मेल नहीं खाते!", "error");
+          return;
+        }
+
+        submitBtn.textContent = "बदल रहा है...";
+        submitBtn.disabled = true;
+        try {
+          const cred = firebase.auth.EmailAuthProvider.credential(user.email, currPass);
+          await user.reauthenticateWithCredential(cred);
+          await user.updatePassword(newPass);
+          document.getElementById("school-cred-modal").classList.add("hidden");
+          showToast("आपका पासवर्ड सफलतापूर्वक बदल गया!");
+        } catch (err) {
+          showToast(mapFirebaseAuthError(err), "error");
+        } finally {
+          submitBtn.textContent = "पासवर्ड बदलें";
+          submitBtn.disabled = false;
+        }
+      });
 
       const tabs = ["students", "transactions", "defaulters"];
       tabs.forEach(tabKey => {
@@ -3407,6 +4001,10 @@
           refreshSchoolAppUI();
           await saveSchoolDataToFirebase();
         } else if (type === "school") {
+          const targetSchool = appState.allSchools[id];
+          if (targetSchool && targetSchool.ownerUid) {
+            await fbDelete(`uid_to_school/${targetSchool.ownerUid}`).catch(() => {});
+          }
           await fbDelete(`schools/${id}`);
           await fbDelete(`school_data/${id}`);
           await refreshSuperAdminSchools();
@@ -3534,8 +4132,12 @@
         } else if (el.classList.contains("sa-share-wa-btn")) {
           const s = appState.allSchools[id];
           if (s) {
-            const msg = `*${s.schoolName}* - FeesFlow Pro सॉफ्टवेयर लॉगिन विवरण:\n\n• यूजर आईडी (User ID): *${s.schoolId}*\n• पासवर्ड (Password): *${s.password}*\n• वैधता (Validity): ${s.expiryDate}\n\nआपको भेजी गई FeesFlow HTML फाइल को खोलकर ऊपर दी गई ID और Password से लॉगिन करें।`;
-            openWhatsAppChat("", msg);
+            const tempPass = tempCreatedPasswords[s.schoolId];
+            const passLine = tempPass
+              ? `• शुरुआती पासवर्ड (Password): *${tempPass}*`
+              : `• पासवर्ड: आपका सेट किया हुआ पासवर्ड (भूलने पर Forgot Password का उपयोग करें)`;
+            const msg = `*${s.schoolName}* - FeesFlow Pro लॉगिन विवरण:\n\n🌐 *वेबसाइट लिंक:* ${LIVE_APP_URL}\n• लॉगिन Gmail ID: *${s.email || s.schoolId}*\n${passLine}\n• वैधता (Validity): ${s.expiryDate || "-"}\n\nऊपर दिए गए लिंक को Chrome में खोलें और अपनी Gmail व पासवर्ड से लॉगिन करें।`;
+            openWhatsAppChat(s.phone || "", msg);
           }
         }
         else if (el.classList.contains("switch-session-btn")) {
